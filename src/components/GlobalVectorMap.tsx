@@ -237,6 +237,7 @@ export const GlobalVectorMap: React.FC<GlobalVectorMapProps> = ({
   const [zoomOutCount, setZoomOutCount] = useState<number>(0);
   const [resetCount, setResetCount] = useState<number>(0);
   const [focusVehicle, setFocusVehicle] = useState<Vehicle | null>(null);
+  const [mapLoadError, setMapLoadError] = useState<boolean>(false);
 
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => v.vehicle_id === selectedVehicleId) || null,
@@ -311,80 +312,192 @@ export const GlobalVectorMap: React.FC<GlobalVectorMapProps> = ({
 
       {/* Main Google Maps Viewport with APIProvider */}
       <div className="relative flex-1 w-full h-full">
-        <APIProvider apiKey={GOOGLE_MAPS_API_KEY} solutionChannel="GMP_aistudio">
-          <Map
-            style={{ width: '100%', height: '100%' }}
-            defaultCenter={{ lat: 49.5, lng: 9.0 }}
-            defaultZoom={5}
-            mapId="DEMO_MAP_ID"
-            disableDefaultUI={true}
-            gestureHandling="greedy"
-            colorScheme="LIGHT"
-            internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+        {!mapLoadError ? (
+          <APIProvider
+            apiKey={GOOGLE_MAPS_API_KEY}
+            solutionChannel="GMP_aistudio"
+            onError={(error) => {
+              console.warn('Google Maps API failed to load, switching to tactical vector fallback:', error);
+              setMapLoadError(true);
+            }}
           >
-            {/* Map Camera Controller */}
-            <MapController
-              activeSector={activeSector}
-              zoomInTrigger={zoomInCount}
-              zoomOutTrigger={zoomOutCount}
-              resetTrigger={resetCount}
-              focusVehicle={focusVehicle}
-            />
+            <Map
+              style={{ width: '100%', height: '100%' }}
+              defaultCenter={{ lat: 49.5, lng: 9.0 }}
+              defaultZoom={5}
+              mapId="DEMO_MAP_ID"
+              disableDefaultUI={true}
+              gestureHandling="greedy"
+              colorScheme="LIGHT"
+              internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+            >
+              {/* Map Camera Controller */}
+              <MapController
+                activeSector={activeSector}
+                zoomInTrigger={zoomInCount}
+                zoomOutTrigger={zoomOutCount}
+                resetTrigger={resetCount}
+                focusVehicle={focusVehicle}
+              />
 
-            {/* Polylines & Hazards */}
-            <MapOverlays
-              vehicles={vehicles}
-              selectedVehicleId={selectedVehicleId}
-              showRoutes={layers.routes}
-              showHazards={layers.hazards}
-            />
+              {/* Polylines & Hazards */}
+              <MapOverlays
+                vehicles={vehicles}
+                selectedVehicleId={selectedVehicleId}
+                showRoutes={layers.routes}
+                showHazards={layers.hazards}
+              />
 
-            {/* Markers for All 14 European Fleet Trucks */}
-            {layers.trucks &&
-              vehicles.map((v) => {
-                const isSelected = v.vehicle_id === selectedVehicleId;
+              {/* Markers for All 14 European Fleet Trucks */}
+              {layers.trucks &&
+                vehicles.map((v) => {
+                  const isSelected = v.vehicle_id === selectedVehicleId;
 
-                return (
-                  <AdvancedMarker
-                    key={v.vehicle_id}
-                    position={{ lat: v.location.latitude, lng: v.location.longitude }}
-                    onClick={() => {
-                      onSelectVehicle(v.vehicle_id);
-                      setFocusVehicle(v);
-                    }}
-                    zIndex={isSelected ? 1000 : 100}
-                  >
-                    {/* Modern Clean Truck Pin Badge */}
-                    <div
-                      className={`relative px-2.5 py-1.5 flex items-center gap-1.5 cursor-pointer rounded-lg shadow-md border transition-all ${
-                        isSelected
-                          ? 'bg-blue-600 text-white border-blue-700 ring-4 ring-blue-500/20 scale-105 shadow-lg'
-                          : 'bg-white text-slate-800 border-slate-300 hover:border-blue-400 hover:shadow-lg'
-                      }`}
+                  return (
+                    <AdvancedMarker
+                      key={v.vehicle_id}
+                      position={{ lat: v.location.latitude, lng: v.location.longitude }}
+                      onClick={() => {
+                        onSelectVehicle(v.vehicle_id);
+                        setFocusVehicle(v);
+                      }}
+                      zIndex={isSelected ? 1000 : 100}
                     >
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          v.status === 'ON-ROUTE'
-                            ? (isSelected ? 'bg-white' : 'bg-emerald-500')
-                            : 'bg-amber-500'
+                      {/* Modern Clean Truck Pin Badge */}
+                      <div
+                        className={`relative px-2.5 py-1.5 flex items-center gap-1.5 cursor-pointer rounded-lg shadow-md border transition-all ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-700 ring-4 ring-blue-500/20 scale-105 shadow-lg'
+                            : 'bg-white text-slate-800 border-slate-300 hover:border-blue-400 hover:shadow-lg'
                         }`}
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            v.status === 'ON-ROUTE'
+                              ? (isSelected ? 'bg-white' : 'bg-emerald-500')
+                              : 'bg-amber-500'
+                          }`}
+                        />
+
+                        <span className="font-bold text-xs font-mono tracking-tight">
+                          {v.vehicle_id}
+                        </span>
+
+                        <span className={`text-[10px] px-1 py-0.2 rounded font-semibold ${
+                          isSelected ? 'bg-blue-700 text-white' : 'bg-slate-100 border border-slate-200 text-slate-700'
+                        }`}>
+                          {Math.round(v.metrics.speed_kmh)}k
+                        </span>
+                      </div>
+                    </AdvancedMarker>
+                  );
+                })}
+            </Map>
+          </APIProvider>
+        ) : (
+          /* Tactical Vector European Corridor Map Fallback */
+          <div className="w-full h-full bg-[#E2E8F0] relative overflow-hidden flex items-center justify-center p-4">
+            <svg viewBox="0 0 1000 650" className="w-full h-full max-h-full object-contain">
+              {/* European Grid Lines */}
+              <defs>
+                <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                  <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#CBD5E1" strokeWidth="0.8" />
+                </pattern>
+              </defs>
+              <rect width="1000" height="650" fill="#E2E8F0" />
+              <rect width="1000" height="650" fill="url(#grid)" opacity="0.6" />
+
+              {/* European Corridor Schematic Paths */}
+              {layers.routes && (
+                <g stroke="#94A3B8" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="6,4">
+                  {/* Rhine-Alpine Corridor */}
+                  <polyline points="420,180 435,260 450,330 460,400 470,480" stroke="#3B82F6" strokeWidth="3.5" />
+                  {/* Benelux-Baltic Corridor */}
+                  <polyline points="380,210 460,220 540,230 650,220 750,210" stroke="#6366F1" strokeWidth="3" />
+                  {/* Mediterranean Corridor */}
+                  <polyline points="280,480 340,430 420,400 480,430 550,460" stroke="#10B981" strokeWidth="3" />
+                </g>
+              )}
+
+              {/* Major Freight Hubs */}
+              {[
+                { name: 'Rotterdam (Port)', x: 410, y: 220 },
+                { name: 'Hamburg Terminal', x: 490, y: 170 },
+                { name: 'Frankfurt Hub', x: 445, y: 270 },
+                { name: 'Munich Logistics', x: 495, y: 340 },
+                { name: 'Milan Intermodal', x: 465, y: 415 },
+                { name: 'Lyon Logistics', x: 375, y: 380 },
+                { name: 'Bologna Freight', x: 490, y: 440 },
+                { name: 'Vienna Cargo', x: 580, y: 320 },
+                { name: 'Warsaw Hub', x: 670, y: 215 },
+              ].map((hub, i) => (
+                <g key={i}>
+                  <circle cx={hub.x} cy={hub.y} r="5" fill="#64748B" />
+                  <circle cx={hub.x} cy={hub.y} r="2.5" fill="#FFFFFF" />
+                  <text x={hub.x + 8} y={hub.y + 4} fill="#475569" fontSize="11" fontWeight="600" fontFamily="sans-serif">
+                    {hub.name}
+                  </text>
+                </g>
+              ))}
+
+              {/* Vehicles converted to SVG coordinates */}
+              {layers.trucks &&
+                vehicles.map((v) => {
+                  const isSelected = v.vehicle_id === selectedVehicleId;
+                  // Map Lat (36-60) and Lng (-10 to 25) to SVG (0-1000, 0-650)
+                  const svgX = ((v.location.longitude - (-10)) / 35) * 1000;
+                  const svgY = ((60 - v.location.latitude) / 24) * 650;
+
+                  return (
+                    <g
+                      key={v.vehicle_id}
+                      onClick={() => onSelectVehicle(v.vehicle_id)}
+                      className="cursor-pointer"
+                      transform={`translate(${svgX}, ${svgY})`}
+                    >
+                      <circle
+                        r={isSelected ? 14 : 9}
+                        fill={isSelected ? '#2563EB' : '#FFFFFF'}
+                        stroke={isSelected ? '#1D4ED8' : '#64748B'}
+                        strokeWidth="2.5"
                       />
-
-                      <span className="font-bold text-xs font-mono tracking-tight">
+                      <circle
+                        r="4"
+                        fill={v.status === 'ON-ROUTE' ? '#10B981' : '#F59E0B'}
+                      />
+                      <rect
+                        x="-30"
+                        y="14"
+                        width="60"
+                        height="18"
+                        rx="4"
+                        fill={isSelected ? '#1E3A8A' : '#FFFFFF'}
+                        stroke={isSelected ? '#2563EB' : '#CBD5E1'}
+                        strokeWidth="1"
+                      />
+                      <text
+                        x="0"
+                        y="26"
+                        textAnchor="middle"
+                        fill={isSelected ? '#FFFFFF' : '#0F172A'}
+                        fontSize="9"
+                        fontWeight="700"
+                        fontFamily="monospace"
+                      >
                         {v.vehicle_id}
-                      </span>
+                      </text>
+                    </g>
+                  );
+                })}
+            </svg>
 
-                      <span className={`text-[10px] px-1 py-0.2 rounded font-semibold ${
-                        isSelected ? 'bg-blue-700 text-white' : 'bg-slate-100 border border-slate-200 text-slate-700'
-                      }`}>
-                        {Math.round(v.metrics.speed_kmh)}k
-                      </span>
-                    </div>
-                  </AdvancedMarker>
-                );
-              })}
-          </Map>
-        </APIProvider>
+            {/* Offline / Key-Free Vector Banner */}
+            <div className="absolute bottom-3 left-3 bg-white/95 border border-slate-300 rounded-lg px-3 py-1.5 text-[11px] text-slate-700 shadow-2xs font-semibold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              <span>Tactical European Corridor Vector Engine Active</span>
+            </div>
+          </div>
+        )}
 
         {/* Tactical Coordinates HUD Overlay */}
         <div className="absolute top-3 left-3 z-10 pointer-events-none text-[11px] text-slate-700 bg-white/95 backdrop-blur-xs border border-slate-300 rounded-lg p-2.5 shadow-xs space-y-0.5 font-medium">

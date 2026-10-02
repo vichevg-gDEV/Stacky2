@@ -51,8 +51,8 @@ export const NavBar: React.FC<NavBarProps> = ({
   ];
 
   return (
-    <nav className="w-full bg-slate-100/90 border-b border-slate-300 px-5 py-2.5 flex items-center gap-2 overflow-x-auto text-xs shadow-2xs">
-      <span className="text-slate-500 font-bold tracking-wider pr-1.5 select-none shrink-0 uppercase text-[11px]">
+    <nav className="w-full bg-slate-200/75 border-b border-slate-300 px-5 py-2.5 flex items-center gap-2 overflow-x-auto text-xs shadow-2xs">
+      <span className="text-slate-600 font-bold tracking-wider pr-1.5 select-none shrink-0 uppercase text-[11px]">
         Views:
       </span>
       {navItems.map((item) => {
@@ -64,7 +64,7 @@ export const NavBar: React.FC<NavBarProps> = ({
             className={`px-3.5 py-1.5 flex items-center gap-2 whitespace-nowrap rounded-lg text-xs transition-all border ${
               isActive
                 ? 'bg-blue-600 border-blue-700 text-white shadow-xs font-semibold ring-2 ring-blue-500/25'
-                : 'bg-white border-slate-300 text-slate-700 hover:text-slate-950 hover:bg-slate-50 hover:border-slate-400 shadow-2xs font-medium'
+                : 'bg-white border-slate-300 text-slate-800 hover:text-blue-700 hover:bg-slate-50 hover:border-slate-400 shadow-2xs font-medium'
             }`}
           >
             {item.icon}
